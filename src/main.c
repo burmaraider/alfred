@@ -10,26 +10,16 @@
 #include "temp.h"
 #include "bmp.h"
 
-/*The edges of the play field*/
-const int LEFT_EDGE = 0;
-const int RIGHT_EDGE = 320;
-const int TOP_EDGE = 0;
-const int BOTTOM_EDGE = 224;
-
-static void updateCamera(struct player *player);
-static void debugInfo();
-    
+#define pixelUpdateRate 2
 s16 currentPixels = 0;       //Detect current pixels moved, if it hits 8, reset 
 s16 offset = 0;             //scroll amount in pixels
 s16 column_to_update = 0;   //column to update while scrolling
 s16 columnOffset = 40;      //offset to be used in our collision map
 
-
 TileMap *testMap; //Map DATA
 
 int main()
 {
-    
     char buffer[20];
 
     // disable interrupt when accessing VDP
@@ -52,67 +42,20 @@ int main()
     SYS_enableInts();
 
     //lets draw out shitty map
-    //VDP_loadTileSet(level1.tileset, 0, DMA);
-    VDP_loadTileSet(bgTile.tileset, 0, DMA );
-    VDP_loadTileSet(bgTile.tileset, 0, DMA );
     VDP_loadTileSet(bgTile.tileset, 0, DMA );
 
-    //VDP_setMap(BG_B, &testMap, 0, 80, 28);
-    //VDP_setTileMapEx(BG_B, &testMap, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, TILE_USERINDEX), 0, 0, 0, 0, 80, 28, DMA);
 
     VDP_setPalette(PAL0, bgTile.palette->data);
     VDP_setBackgroundColor(0xFF);
 
     int tile =0;
 
-    //testMap = unpackTileMap(&mapData, NULL);
-
+    //Draw our map initially at 0,0
+    //Later we will determine where to draw based on a "spawn point"
     testMap = allocateTileMapEx(80, 28);
     testMap->tilemap = &mapData;
+    VDP_setTileMapEx(BG_B, testMap, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, mapData[TILE_USERINDEX]-1), 0,0, 0,0,40,28, DMA_QUEUE);
     
-
-
-    
-    // for(int y=0; y < 28; y++ )
-    // {
-    //     for (int x = 0; x < 40; x++)
-    //     {
-    //         if(mapData[tile] >= 0x1)
-    //         {
-    //             VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL0, FALSE, FALSE, FALSE, mapData[tile]), x, y);
-                
-    //         }
-            
-    //         tile++;
-    //     }
-    // }
-    
-
-   VDP_setTileMapEx(BG_B, testMap, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, mapData[TILE_USERINDEX]-1), 0,0, 0,0,40,28, DMA_QUEUE);
-    
-    
-   /*
-    for(int y=0; y < 28; y++ )
-    {
-        for (int x = 0; x < 40; x++)
-        {
-            if(mapData[tile] >= 0x1)
-            {
-                VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL0, FALSE, FALSE, FALSE, mapData[tile]-1), x, y);
-                
-            }
-            
-            tile++;
-        }
-    }
-*/
-
-    //allocateTileMapEx()
-
-
-    //VDP_drawImageEx(BG_B, &bg_image, TILE_ATTR_FULL(PAL0, FALSE, FALSE, FALSE, ind), 0, 0, FALSE, TRUE);
-    //ind += bg_image.tileset->numTile;
-
     //Lets setup our Palettes here
     VDP_setPalette(PAL3, playerSprite.palette->data);
     VDP_setTextPalette(PAL1);
@@ -121,9 +64,8 @@ int main()
     SPR_init(0,0,0);
 
     
-
+    //Setup our player object
     player myPlayer;
-
     myPlayer.properties.velX = FIX32(0L);
     myPlayer.properties.velY = FIX32(0L);
     myPlayer.properties.maxSpeed = FIX32(20L);
@@ -144,26 +86,21 @@ int main()
     game.gameState = playing;
     game.lastJumpTimer = 0;
     const int scrollspeed = 2; 
-
+    //Some debug information for us to see where collision is happening
     game.debugTileBottom = SPR_addSprite(&debugSprite, 100, 100, TILE_ATTR(PAL3,0, FALSE, FALSE));
     game.debugTileLeft = SPR_addSprite(&debugSprite, 100, 100, TILE_ATTR(PAL2,0, FALSE, FALSE));
 
 
     while(1)
     {
-
-        if(game.canKeepJump == TRUE)
-        {
-            game.canKeepJump = FALSE;
-            testMap->tilemap = &level2;
-        }
-
-        // update sprites
+        //Update our player and handle control
         movePlayer(&myPlayer, &game);
         handleInput(&myPlayer, &game);
+        // update sprites
         SPR_update();
         //Wait for VSync
         VDP_waitVSync();
+        
         updateCamera(&myPlayer);
         debugInfo();
         //VDP_drawText("                                 ", 10, 10);
@@ -449,20 +386,10 @@ void movePlayer(struct player *player, struct gamePlay *game)
             player->onGround = TRUE;
             player->falling = FALSE;
         }
-
-        //Set our x and y position on screen
-        player->properties.x += player->properties.velX;
-        player->properties.y += player->properties.velY;
-
-
-            offset = offset + fix32ToInt(player->properties.velX);
-            currentPixels = currentPixels + fix32ToInt(player->properties.velX);
-            if(currentPixels > 1) currentPixels=0;
-            if(currentPixels < -1) currentPixels=-1;
-            //if(currentPixels<-15) currentPixels=0;
         
-
-        
+        ///////////////////////////
+        ////DEBUG STUFF
+        ///////////////////////////
         //Show our X and Y position
         char buffer[20];
         sprintf(buffer, "X:%d Y:%d", fix32ToInt(player->properties.x), fix32ToInt(player->properties.y));
@@ -482,26 +409,37 @@ void movePlayer(struct player *player, struct gamePlay *game)
         VDP_drawText("                    ", 1, 4);
         VDP_drawText(buffer, 1,4);
         MEM_free(buffer);
-        
-        //Basic "deadzone" before movement will occur
-        if(tilex < 13 && offset != 0)
-        {
-            // offset--; 
-            // currentPixels--;  
-            // if(currentPixels<-7) currentPixels=0;
-           // player->properties.x = intToFix32(13 << 3);
-            
-        }
-        //Basic "deadzone" before movement will occur
-        else if(tilex > 22 && offset != (testMap->w << 2))
-        {
-            // offset++; 
-            // currentPixels++;  
-            // if(currentPixels>7) currentPixels=0;
-            //player->properties.x = intToFix32(23 << 3)-1; //-1 so that the scrolling doesnt keep happening when we release right
-        }
 
-        //Yep Alfred sure is slow
+        ///////////////////////////
+        ///END DEBUG STUFF
+        ///////////////////////////
+
+        //Set our players new X and Y
+        player->properties.x += player->properties.velX;
+        player->properties.y += player->properties.velY;
+
+        //temp variable for x velocity
+        int tempVelX = fix32ToInt(player->properties.velX);
+        //Basic "deadzone" before movement will occur
+        if(tilex > 22 && player->buttonsPressed[3] == 1)
+        {
+            if(offset != 320)
+            player->properties.x = intToFix32(23 << 3);
+            offset = offset + tempVelX;
+            currentPixels = currentPixels + tempVelX;
+            if(currentPixels > pixelUpdateRate) currentPixels=0;
+            if(currentPixels < -pixelUpdateRate) currentPixels=-1;
+        }
+        //Basic "deadzone" before movement will occur
+        if(tilex < 14 && player->buttonsPressed[2] == 1)
+        {
+            if(offset != 0)
+            player->properties.x = intToFix32(13 << 3);
+            offset = offset + tempVelX;
+            currentPixels = currentPixels + tempVelX;
+            if(currentPixels > pixelUpdateRate) currentPixels=0;
+            if(currentPixels < -pixelUpdateRate) currentPixels=-1;
+        }
         setSpritePosition(player->sprite, fix32ToInt(player->properties.x), fix32ToInt(player->properties.y));
     }
 }

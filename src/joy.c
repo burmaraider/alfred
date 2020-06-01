@@ -7,10 +7,14 @@ void handleInput(struct player *player, struct gamePlay *game)
     if (value & BUTTON_LEFT)
     {
         player->properties.xOrder = -1;
+        player->buttonsPressed[2] = 1;
+        player->buttonsPressed[3] = 0;
     }
     else if (value & BUTTON_RIGHT) 
     {
         player->properties.xOrder = +1;
+        player->buttonsPressed[2] = 0;
+        player->buttonsPressed[3] = 1;
     }
     else 
     {
