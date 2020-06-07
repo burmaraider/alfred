@@ -9,15 +9,21 @@ void handleInput(struct player *player, struct gamePlay *game)
         player->properties.xOrder = -1;
         player->buttonsPressed[2] = 1;
         player->buttonsPressed[3] = 0;
+<<<<<<< HEAD
         SPR_setHFlip(player->sprite, TRUE);
         
+=======
+>>>>>>> b22d667cc1e0f10fbddfd4ea055b02be48685133
     }
     else if (value & BUTTON_RIGHT) 
     {
         player->properties.xOrder = +1;
         player->buttonsPressed[2] = 0;
         player->buttonsPressed[3] = 1;
+<<<<<<< HEAD
         SPR_setHFlip(player->sprite, FALSE);
+=======
+>>>>>>> b22d667cc1e0f10fbddfd4ea055b02be48685133
     }
     else 
     {
