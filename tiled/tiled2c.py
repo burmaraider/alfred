@@ -114,7 +114,7 @@ class Tile2C(object):
         try:
             f.write("const unsigned char %s_map_data[%s] = {\n" % (tiles_name, width*height))
             for i in range(height):
-                f.write(",".join(["%s" % hex(int(x)) for x in tiles[width*i:width*(i+1)]]))
+                f.write(",".join(["%s" % hex((int(x)-1)) for x in tiles[width*i:width*(i+1)]]))
                 f.write(",\n")
             f.write("};\n")
 

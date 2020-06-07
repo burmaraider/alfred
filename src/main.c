@@ -18,10 +18,26 @@ s16 columnOffset = 40;      //offset to be used in our collision map
 
 TileMap *testMap; //Map DATA
 
+s16 columnUpdate;
+u32 vscroll;
+u16 frame;
+static void changePal(struct player *player, struct gamePlay *game, int col);
+
+u8 tilesetoffset[2];
+
+void myHBlankFunction()
+{
+   // modify V scroll value
+   //VDP_setVerticalScroll(BG_B, vscroll);
+   VDP_setHorizontalScroll(BG_B, vscroll);
+   //VDP_setHorizontalScrollLine(BG_B, vscroll, vscroll_data, sizeof(vscroll_data), DMA_QUEUE);
+   vscroll += 5;
+}
 int main()
 {
     char buffer[20];
-
+    int testFrame = 0;
+    frame = 128;
     // disable interrupt when accessing VDP
     SYS_disableInts();
     // initialization
@@ -37,12 +53,16 @@ int main()
     JOY_init();
     JOY_setEventHandler(NULL);
 
-    // reduce DMA buffer size to avoid running out of memory (we don't need it)
+    
     //Enable sys interrupts
     SYS_enableInts();
 
+    tilesetoffset[0] = 0;
+    tilesetoffset[1] = bgTile2.tileset->numTile;
     //lets draw out shitty map
-    VDP_loadTileSet(bgTile.tileset, 0, DMA );
+    VDP_loadTileSet(bgTile2.tileset, 0, DMA);
+    VDP_loadTileSet(bgTile.tileset, bgTile2.tileset->numTile, DMA );
+    
 
 
     VDP_setPalette(PAL0, bgTile.palette->data);
@@ -54,7 +74,7 @@ int main()
     //Later we will determine where to draw based on a "spawn point"
     testMap = allocateTileMapEx(80, 28);
     testMap->tilemap = &mapData;
-    VDP_setTileMapEx(BG_B, testMap, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, mapData[TILE_USERINDEX]-1), 0,0, 0,0,40,28, DMA_QUEUE);
+    VDP_setTileMapEx(BG_B, testMap, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, tilesetoffset[1]), 0,0, 0,0,40,28, DMA_QUEUE);
     
     //Lets setup our Palettes here
     VDP_setPalette(PAL3, playerSprite.palette->data);
@@ -98,9 +118,40 @@ int main()
         handleInput(&myPlayer, &game);
         // update sprites
         SPR_update();
+
+
+
+
+        
+            //DMA_doVRamCopy(0x0002, 0x0007, 1, 2);
+            
+            //DMA_doVRamCopy(columnUpdate, 0x0002, 0x01, 1);
+            
+            
+        //DMA_doVRamCopy(columnUpdate, , 0x01, 1);
+        if(columnUpdate > 16)
+        {
+            
+            if(frame >= 2048) frame = 128;
+            //DMA_doVRamFill(0x0002, sizeof(bgTile.tileset[0]), 0x00, 1);
+            //DMA_doVRamCopy(32, 2, 16, 1);
+            //DMA_doVRamCopy(frame, 352, 1024, 1);
+            DMA_doVRamCopy(frame, (21 << 5), 32, 1);
+            for(int i= 0; i< 16, i++;)
+            {
+                playerSprite.palette->data[i] >> 2;
+            }
+            VDP_setPalette(PAL3, playerSprite.palette->data);
+            columnUpdate = 0;
+            frame += 32;
+        }
+        columnUpdate++;
+
+        
+
         //Wait for VSync
         VDP_waitVSync();
-        
+        //vscroll = 0;
         updateCamera(&myPlayer);
         debugInfo();
         //VDP_drawText("                                 ", 10, 10);
@@ -109,10 +160,12 @@ int main()
     return (0);
 }
 
+
+
 bool checkFloor(struct player *player, struct gamePlay *game)
 {
     char buffer[40];
-    int tilex, tiley, currentTileIndex;;
+    int tilex, tiley, currentTileIndex;
     //Calculate which tilemap the player is interacting with
     //Adjusts for scrolling of the map
     if(offset != 0 || offset !=(testMap->w<<2))
@@ -125,8 +178,9 @@ bool checkFloor(struct player *player, struct gamePlay *game)
     }
     
     //Since we dont scroll vertically in this game... this is acceptable
-    tiley = (fix32ToInt(player->properties.y) + 16)/8;  
+    tiley = (fix32ToInt(player->properties.y) + 24)/8;  
 
+    
     
     currentTileIndex = (columnOffset - 40) + tilex + (testMap->w * tiley);
  
@@ -137,8 +191,12 @@ bool checkFloor(struct player *player, struct gamePlay *game)
         VDP_drawText("                    ", 10, 13);
         VDP_drawText(buff, 10, 13);
         setSpritePosition(game->debugTileBottom, tilex << 3, tiley<<3);
+        //Sets the tile we touch palette to PAL1, with a higher priority
+        VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL1, 1, FALSE, FALSE, testMap->tilemap[currentTileIndex]+tilesetoffset[1]), tilex +(offset >>3), tiley);
         return TRUE;
     }
+
+    
     
     MEM_free(buffer);
     
@@ -494,14 +552,14 @@ static void updateCamera(struct player *player)
     {
         column_to_update = (((offset + 320) >>3)) & 127;
 
-        VDP_setTileMapEx(BG_B, testMap, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, 0), column_to_update, 0, column_to_update, 0, 1, 28, DMA_QUEUE );
+        VDP_setTileMapEx(BG_B, testMap, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, tilesetoffset[1]), column_to_update, 0, column_to_update, 0, 1, 28, DMA_QUEUE );
         
     }
     //Move to the left
     if(currentPixels==-1)
     {
-        column_to_update = (((offset + 320) >> 3) + 88) & 127;
-       VDP_setTileMapEx(BG_B, testMap, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, 0), column_to_update, 0, column_to_update, 0, 1, 28, DMA_QUEUE );
+        column_to_update = (((offset + 320) >> 3) + 88-1) & 127;
+       VDP_setTileMapEx(BG_B, testMap, TILE_ATTR_FULL(PAL0, 0, FALSE, FALSE, tilesetoffset[1]), column_to_update, 0, column_to_update, 0, 1, 28, DMA_QUEUE );
     }
 
     //hacemos scroll
@@ -519,4 +577,23 @@ static void debugInfo()
     VDP_drawText("                    ", 10, 12);
     VDP_drawText(buffer, 10, 12);
     MEM_free(buffer);
+}
+
+static void changePal(struct player *player, struct gamePlay *game, int col)
+{
+    int currentTileIndex;
+
+    for (int y = 0; y < 28; y++)
+    {
+            currentTileIndex = (columnOffset - 40) + col + (testMap->w * y);
+            if(testMap->tilemap[currentTileIndex] == 0x34)
+            {
+                VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL1, 1, FALSE, FALSE, testMap->tilemap[currentTileIndex] + tilesetoffset[1]), col +(offset >>3), y);
+                //VDP_setTileMapData(VDP_BG_B, TILE_ATTR_FULL(PAL1, 1, FALSE, FALSE, testMap->tilemap[currentTileIndex]), testMap->tilemap[currentTileIndex], 1, 2, DMA_QUEUE);
+            }
+    }
+
+    
+
+    
 }
