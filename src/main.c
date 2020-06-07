@@ -589,7 +589,6 @@ static void changePal(struct player *player, struct gamePlay *game, int col)
             if(testMap->tilemap[currentTileIndex] == 0x34)
             {
                 VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL1, 1, FALSE, FALSE, testMap->tilemap[currentTileIndex] + tilesetoffset[1]), col +(offset >>3), y);
-                //VDP_setTileMapData(VDP_BG_B, TILE_ATTR_FULL(PAL1, 1, FALSE, FALSE, testMap->tilemap[currentTileIndex]), testMap->tilemap[currentTileIndex], 1, 2, DMA_QUEUE);
             }
     }
 
